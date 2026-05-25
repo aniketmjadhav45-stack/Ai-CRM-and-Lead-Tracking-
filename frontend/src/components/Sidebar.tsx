@@ -11,7 +11,8 @@ import {
   MessageSquare,
   Cable,
   BarChart3,
-  Bot
+  Bot,
+  Users
 } from "lucide-react";
 
 export default function Sidebar() {
@@ -19,6 +20,7 @@ export default function Sidebar() {
 
   const menuItems = [
     { id: "dashboard", label: "Operations Dashboard", icon: LayoutDashboard },
+    { id: "leads", label: "Advanced Leads Table", icon: Users },
     { id: "pipeline", label: "CRM Lead Pipeline", icon: KanbanSquare },
     { id: "workflows", label: "Zapier Automations", icon: GitBranch },
     { id: "voice-agent", label: "AI Voice Call Center", icon: PhoneCall },

@@ -12,7 +12,11 @@ import CalendarView from "../components/CalendarView";
 import MessagingView from "../components/MessagingView";
 import IntegrationsView from "../components/IntegrationsView";
 import AnalyticsView from "../components/AnalyticsView";
+import LeadsTableView from "../components/LeadsTableView";
 import { PhoneCall, Sparkles } from "lucide-react";
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+const queryClient = new QueryClient();
 
 function MainContent() {
   const { activeTab, setActiveTab, activeCallSimulator } = useApp();
@@ -21,6 +25,8 @@ function MainContent() {
     switch (activeTab) {
       case "dashboard":
         return <DashboardView />;
+      case "leads":
+        return <LeadsTableView />;
       case "pipeline":
         return <PipelineView />;
       case "workflows":
@@ -82,8 +88,10 @@ function MainContent() {
 
 export default function Home() {
   return (
-    <AppProvider>
-      <MainContent />
-    </AppProvider>
+    <QueryClientProvider client={queryClient}>
+      <AppProvider>
+        <MainContent />
+      </AppProvider>
+    </QueryClientProvider>
   );
 }

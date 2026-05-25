@@ -20,4 +20,10 @@ export class CrmController {
     if (!orgId) throw new Error('x-org-id header required');
     return this.crmService.getContacts(orgId);
   }
+
+  @Get('analytics')
+  async getDashboardAnalytics(@Headers('x-org-id') orgId: string) {
+    if (!orgId) throw new Error('x-org-id header required');
+    return this.crmService.getDashboardAnalytics(orgId);
+  }
 }
