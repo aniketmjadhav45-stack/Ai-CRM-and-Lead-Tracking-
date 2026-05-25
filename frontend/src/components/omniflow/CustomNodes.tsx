@@ -1,10 +1,11 @@
 import React, { memo } from 'react';
 import { Handle, Position } from '@xyflow/react';
-import { Zap, Play, MessageSquare, Bot, GitMerge, CheckCircle2 } from 'lucide-react';
+import { Zap, Play, MessageSquare, Bot, GitMerge, CheckCircle2, Mail } from 'lucide-react';
 
 const icons: Record<string, React.ReactNode> = {
   trigger: <Zap className="w-5 h-5 text-emerald-400" />,
   action_sms: <MessageSquare className="w-5 h-5 text-blue-400" />,
+  action_email: <Mail className="w-5 h-5 text-sky-400" />,
   action_ai: <Bot className="w-5 h-5 text-purple-400" />,
   logic: <GitMerge className="w-5 h-5 text-amber-400" />,
   success: <CheckCircle2 className="w-5 h-5 text-emerald-400" />

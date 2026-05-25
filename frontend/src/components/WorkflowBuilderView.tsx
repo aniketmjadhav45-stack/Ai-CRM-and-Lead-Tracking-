@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import { 
   ReactFlow, 
   Background, 
@@ -13,11 +13,14 @@ import {
   Edge,
   OnNodesChange,
   OnEdgesChange,
-  OnConnect
+  OnConnect,
+  ReactFlowProvider,
+  useReactFlow
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Play, Settings2, Sparkles, CheckCircle2 } from "lucide-react";
+import { Play, Settings2, Sparkles, Trash2 } from "lucide-react";
 import { TriggerNode, ActionNode, LogicNode } from "./omniflow/CustomNodes";
+import WorkflowSidebar from "./omniflow/WorkflowSidebar";
 
 const nodeTypes = {
   trigger: TriggerNode,
@@ -25,50 +28,15 @@ const nodeTypes = {
   logic: LogicNode,
 };
 
-const initialNodes: Node[] = [
-  {
-    id: '1',
-    type: 'trigger',
-    position: { x: 250, y: 50 },
-    data: { label: 'Inbound Webhook', description: 'Triggers when a new lead is captured via WhatConverts', icon: 'trigger' },
-  },
-  {
-    id: '2',
-    type: 'action',
-    position: { x: 250, y: 200 },
-    data: { label: 'HubSpot Sync', description: 'Create contact and deal in CRM', icon: 'success' },
-  },
-  {
-    id: '3',
-    type: 'logic',
-    position: { x: 250, y: 350 },
-    data: { label: 'High Value Lead?', description: 'If deal value > $1,000', icon: 'logic' },
-  },
-  {
-    id: '4',
-    type: 'action',
-    position: { x: 50, y: 550 },
-    data: { label: 'AI Voice Call', description: 'Dispatch Chloe to qualify lead', icon: 'action_ai' },
-  },
-  {
-    id: '5',
-    type: 'action',
-    position: { x: 450, y: 550 },
-    data: { label: 'Send SMS', description: 'Send introductory text message', icon: 'action_sms' },
-  },
-];
+let id = 0;
+const getId = () => `dndnode_${id++}`;
 
-const initialEdges: Edge[] = [
-  { id: 'e1-2', source: '1', target: '2', animated: true, style: { stroke: '#6366f1', strokeWidth: 2 } },
-  { id: 'e2-3', source: '2', target: '3', animated: true, style: { stroke: '#6366f1', strokeWidth: 2 } },
-  { id: 'e3-4', source: '3', target: '4', sourceHandle: 'true', animated: true, style: { stroke: '#10b981', strokeWidth: 2 } },
-  { id: 'e3-5', source: '3', target: '5', sourceHandle: 'false', animated: true, style: { stroke: '#f43f5e', strokeWidth: 2 } },
-];
-
-export default function WorkflowBuilderView() {
-  const [nodes, setNodes] = useState<Node[]>(initialNodes);
-  const [edges, setEdges] = useState<Edge[]>(initialEdges);
+function FlowRenderer() {
+  const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const [nodes, setNodes] = useState<Node[]>([]);
+  const [edges, setEdges] = useState<Edge[]>([]);
   const [isTesting, setIsTesting] = useState(false);
+  const { screenToFlowPosition } = useReactFlow();
 
   const onNodesChange: OnNodesChange = useCallback(
     (changes) => setNodes((nds) => applyNodeChanges(changes, nds)),
@@ -85,9 +53,53 @@ export default function WorkflowBuilderView() {
     []
   );
 
+  const onDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  const onDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
+
+      const typeStr = event.dataTransfer.getData('application/reactflow');
+      if (!typeStr) {
+        return;
+      }
+
+      const parsed = JSON.parse(typeStr);
+      const type = parsed.type;
+      const nodeData = parsed.data;
+
+      // check if the dropped element is valid
+      if (typeof type === 'undefined' || !type) {
+        return;
+      }
+
+      const position = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+
+      const newNode = {
+        id: getId(),
+        type,
+        position,
+        data: { ...nodeData },
+      };
+
+      setNodes((nds) => nds.concat(newNode));
+    },
+    [screenToFlowPosition],
+  );
+
+  const clearCanvas = () => {
+    setNodes([]);
+    setEdges([]);
+  };
+
   const runTest = () => {
     setIsTesting(true);
-    // Simulate test completion after 3s
     setTimeout(() => {
       setIsTesting(false);
     }, 3000);
@@ -105,19 +117,22 @@ export default function WorkflowBuilderView() {
           </div>
           <h3 className="text-sm font-bold text-white flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-accent-purple" />
-            Lead Intake & Dispatch Automation
+            Workflow Builder
           </h3>
         </div>
 
         <div className="flex gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
-            <Settings2 className="w-3.5 h-3.5" />
-            Node Settings
+          <button 
+            onClick={clearCanvas}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-rose-400 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 transition-colors"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Clear Canvas
           </button>
           
           <button 
             onClick={runTest}
-            disabled={isTesting}
+            disabled={isTesting || nodes.length === 0}
             className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-accent-purple to-accent-indigo border border-accent-purple/35 hover:opacity-90 transition-opacity shadow-[0_0_15px_rgba(139,92,246,0.3)] disabled:opacity-50"
           >
             {isTesting ? (
@@ -135,32 +150,47 @@ export default function WorkflowBuilderView() {
         </div>
       </div>
 
-      {/* React Flow Canvas */}
-      <div className="flex-1 border-x-2 border-b-2 border-card-border rounded-b-2xl bg-[#06060c] overflow-hidden relative">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          nodeTypes={nodeTypes}
-          fitView
-          className="bg-[#0a0a0f]"
-          proOptions={{ hideAttribution: true }}
-        >
-          <Background color="#1e1e2d" gap={16} />
-          <Controls className="!bg-black/80 !border !border-card-border !rounded-xl !overflow-hidden fill-white" />
-          <MiniMap 
-            className="!bg-black/80 !border !border-card-border !rounded-xl" 
-            maskColor="rgba(0, 0, 0, 0.7)"
-            nodeColor={(n) => {
-              if (n.type === 'trigger') return '#10b981';
-              if (n.type === 'logic') return '#f59e0b';
-              return '#6366f1';
-            }}
-          />
-        </ReactFlow>
+      <div className="flex flex-1 border-x-2 border-b-2 border-card-border rounded-b-2xl bg-[#06060c] overflow-hidden relative">
+        {/* React Flow Canvas */}
+        <div className="flex-1 h-full" ref={reactFlowWrapper}>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onDrop={onDrop}
+            onDragOver={onDragOver}
+            nodeTypes={nodeTypes}
+            fitView
+            className="bg-[#0a0a0f]"
+            proOptions={{ hideAttribution: true }}
+          >
+            <Background color="#1e1e2d" gap={16} />
+            <Controls className="!bg-black/80 !border !border-card-border !rounded-xl !overflow-hidden fill-white" />
+            <MiniMap 
+              className="!bg-black/80 !border !border-card-border !rounded-xl" 
+              maskColor="rgba(0, 0, 0, 0.7)"
+              nodeColor={(n) => {
+                if (n.type === 'trigger') return '#10b981';
+                if (n.type === 'logic') return '#f59e0b';
+                return '#6366f1';
+              }}
+            />
+          </ReactFlow>
+        </div>
+
+        {/* Sidebar Palette */}
+        <WorkflowSidebar />
       </div>
     </div>
+  );
+}
+
+export default function WorkflowBuilderView() {
+  return (
+    <ReactFlowProvider>
+      <FlowRenderer />
+    </ReactFlowProvider>
   );
 }
