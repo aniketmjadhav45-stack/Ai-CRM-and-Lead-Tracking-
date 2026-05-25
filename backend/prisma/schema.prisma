@@ -21,6 +21,7 @@ model Organization {
   workflows          Workflow[]
   integrations       Integration[]
   communicationLogs  CommunicationLog[]
+  adAccounts         AdAccount[]
 }
 
 model User {
@@ -37,34 +38,118 @@ model User {
 }
 
 // -----------------------------------------
-// CRM & LEAD TRACKING
+// CRM, LEAD TRACKING & ATTRIBUTION
 // -----------------------------------------
 
 model Contact {
   id             String       @id @default(uuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  // Lead Information
   firstName      String?
   lastName       String?
   email          String?
   phone          String?
-  source         String?
+  company        String?
+  address        String?
+  
+  // Lead Source & Marketing Attribution
+  source         String?      // Google Ads, Organic, Facebook, Referral
+  utmSource      String?
+  utmMedium      String?
+  utmCampaign    String?
+  adSet          String?
+  keyword        String?
+  landingPage    String?
+  costPerLead    Float?       @default(0)
+
+  // Status & Custom Data
   status         String       @default("new") // new, contacted, qualified, lost
+  customFields   Json?        // Flexible storage for CRM sync
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
   deals          Deal[]
+  communications CommunicationLog[]
 }
 
 model Deal {
-  id          String   @id @default(uuid())
-  contactId   String
-  contact     Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  title       String
-  value       Float    @default(0)
-  stage       String   @default("lead") // lead, appointment, estimate, won, lost
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id               String   @id @default(uuid())
+  contactId        String
+  contact          Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  
+  // Sales Data
+  title            String
+  value            Float    @default(0)
+  revenueGenerated Float    @default(0)
+  stage            String   @default("lead") // lead, appointment, estimate, won, lost
+  pipeline         String?  @default("default")
+  assignedOwnerId  String?  // References User ID
+  
+  customFields     Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+// -----------------------------------------
+// ADVERTISING & ROI TRACKING
+// -----------------------------------------
+
+model AdAccount {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  platform       String       // google_ads, meta_ads, tiktok_ads
+  accountId      String       // The ID on the platform
+  accessToken    String?
+  refreshToken   String?
+  tokenExpiresAt DateTime?
+  status         String       @default("active") // active, disconnected
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  campaigns      AdCampaign[]
+}
+
+model AdCampaign {
+  id             String       @id @default(uuid())
+  adAccountId    String
+  adAccount      AdAccount    @relation(fields: [adAccountId], references: [id], onDelete: Cascade)
+  platformId     String       // Campaign ID from the ad network
+  name           String
+  status         String
+  totalSpend     Float        @default(0)
+  clicks         Int          @default(0)
+  impressions    Int          @default(0)
+  leadsGenerated Int          @default(0)
+  revenue        Float        @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+// -----------------------------------------
+// INTEGRATIONS & OAUTH TOKENS
+// -----------------------------------------
+
+model Integration {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  provider       String       // hubspot, salesforce, twilio, sendgrid, gmail, outlook
+  type           String       // crm, email, sms, voice
+  
+  // Credentials (Should be encrypted in production logic before saving)
+  apiKey         String?
+  accessToken    String?
+  refreshToken   String?
+  tokenExpiresAt DateTime?
+  
+  config         Json?        // webhook URLs, connected pipeline IDs, etc.
+  status         String       @default("active") // active, error, disconnected
+  errorMessage   String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 }
 
 // -----------------------------------------
@@ -91,8 +176,8 @@ model WorkflowNode {
   id            String   @id @default(uuid())
   workflowId    String
   workflow      Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  nodeType      String   // trigger_webhook, action_sms, action_ai_call, logic_if
-  configuration Json     // Flexible JSON for storing node settings (e.g. prompt, phone number)
+  nodeType      String   // trigger_webhook, action_sms, action_email, action_ai_call, logic_if
+  configuration Json     // Storing node settings
   positionX     Float    @default(0)
   positionY     Float    @default(0)
   createdAt     DateTime @default(now())
@@ -103,8 +188,8 @@ model WorkflowConnection {
   id          String   @id @default(uuid())
   workflowId  String
   workflow    Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  sourceNode  String   // Reference to WorkflowNode.id
-  targetNode  String   // Reference to WorkflowNode.id
+  sourceNode  String   
+  targetNode  String   
   sourceHandle String?
   targetHandle String?
   createdAt   DateTime @default(now())
@@ -125,37 +210,34 @@ model WorkflowLog {
   id            String      @id @default(uuid())
   workflowRunId String
   run           WorkflowRun @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
-  nodeId        String      // The node that was executed
+  nodeId        String      
   status        String      // success, error
   message       String?
   createdAt     DateTime    @default(now())
 }
 
 // -----------------------------------------
-// UNIFIED COMMUNICATIONS (AI Calling, SMS, WhatsApp)
+// UNIFIED COMMUNICATIONS & TIMELINE
 // -----------------------------------------
 
 model CommunicationLog {
   id             String       @id @default(uuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  type           String       // sms, call, whatsapp, email
+  contactId      String?
+  contact        Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  
+  type           String       // sms, call, whatsapp, email, note, ticket
   direction      String       // inbound, outbound
   from           String
   to             String
   status         String       // queued, sent, failed, completed
-  content        String?      // Body of SMS or transcript of call
+  
+  // Payload Data
+  subject        String?      // For emails
+  content        String?      // Body of SMS/Email or transcript of call/note
   recordingUrl   String?      // Vapi/Twilio recording URL
+  attachments    Json?        // Array of attachment URLs
+  
   createdAt      DateTime     @default(now())
-}
-
-model Integration {
-  id             String       @id @default(uuid())
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  provider       String       // twilio, vapi, hubspot
-  apiKey         String       // (Would be encrypted in production)
-  config         Json?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
 }

@@ -21,10 +21,16 @@ export class WorkflowsService {
       throw new Error('Workflow not found or not active');
     }
 
-    // Add job to BullMQ queue
+    // Add job to BullMQ queue with exponential backoff
     const job = await this.workflowQueue.add('execute-dag', {
       workflowId,
       payload,
+    }, {
+      attempts: 5,
+      backoff: {
+        type: 'exponential',
+        delay: 2000,
+      }
     });
 
     return { success: true, jobId: job.id };

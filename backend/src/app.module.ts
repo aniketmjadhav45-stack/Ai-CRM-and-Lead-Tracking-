@@ -6,6 +6,8 @@ import { CrmModule } from './crm/crm.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { EventsGateway } from './events/events.gateway';
 import { WorkflowsModule } from './workflows/workflows.module';
+import { IntegrationsModule } from './integrations/integrations.module';
+import { CommunicationsModule } from './communications/communications.module';
 
 @Module({
   imports: [
@@ -17,7 +19,7 @@ import { WorkflowsModule } from './workflows/workflows.module';
     }),
     CrmModule, 
     PrismaModule, 
-    WorkflowsModule,
+    WorkflowsModule, IntegrationsModule, CommunicationsModule,
   ],
   controllers: [AppController],
   providers: [AppService, EventsGateway],
